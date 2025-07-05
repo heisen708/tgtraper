@@ -3,6 +3,7 @@ import random
 from aiohttp import web
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+import os
 
 # === Your credentials ===
 api_id = 29010066
@@ -13,6 +14,7 @@ OWNER_ID = 7425304864
 client = TelegramClient(StringSession(string_session), api_id, api_hash)
 
 # === Settings ===
+GROUPS_FILE = "groups.txt"
 active_groups = set()
 reply_message = "all Tamil Movies&Series without ad @MovieByte_7"
 delete_after = 35
@@ -21,20 +23,33 @@ rate_limiter = asyncio.Semaphore(1)
 last_replied = {}
 last_sent_time = 0
 
+# === Persistent Storage ===
+def save_groups():
+    with open(GROUPS_FILE, "w") as f:
+        for gid in active_groups:
+            f.write(f"{gid}\n")
+
+def load_groups():
+    if os.path.exists(GROUPS_FILE):
+        with open(GROUPS_FILE, "r") as f:
+            for line in f:
+                gid = line.strip()
+                if gid:
+                    active_groups.add(int(gid))
+
 # === Check if command is from Saved Messages ===
 def is_saved_messages(event):
     return event.chat_id == OWNER_ID and event.is_private
 
-# === /add <group_id> ===
 @client.on(events.NewMessage(pattern=r'^/add\s+(-?\d+)$'))
 async def add_group(event):
     if not is_saved_messages(event):
         return
     group_id = int(event.pattern_match.group(1))
     active_groups.add(group_id)
+    save_groups()
     await event.reply(f"✅ Group `{group_id}` added.")
 
-# === /remove <group_id> ===
 @client.on(events.NewMessage(pattern=r'^/remove\s+(-?\d+)$'))
 async def remove_group(event):
     if not is_saved_messages(event):
@@ -42,11 +57,11 @@ async def remove_group(event):
     group_id = int(event.pattern_match.group(1))
     if group_id in active_groups:
         active_groups.remove(group_id)
+        save_groups()
         await event.reply(f"❌ Group `{group_id}` removed.")
     else:
         await event.reply("⚠️ Group not found.")
 
-# === /groupinfo ===
 @client.on(events.NewMessage(pattern=r'^/groupinfo$'))
 async def show_group_info(event):
     if not is_saved_messages(event):
@@ -61,7 +76,6 @@ async def show_group_info(event):
     msg += f"\n⏳ Delete after: {delete_after} sec"
     await event.reply(msg)
 
-# === /setmsg <text> ===
 @client.on(events.NewMessage(pattern=r'^/setmsg\s+([\s\S]+)'))
 async def set_reply_message(event):
     if not is_saved_messages(event):
@@ -70,7 +84,6 @@ async def set_reply_message(event):
     reply_message = event.pattern_match.group(1)
     await event.reply("✅ Reply message updated.")
 
-# === /setdel <seconds> ===
 @client.on(events.NewMessage(pattern=r'^/setdel\s+(\d+)$'))
 async def set_delete_time(event):
     if not is_saved_messages(event):
@@ -79,7 +92,6 @@ async def set_delete_time(event):
     delete_after = int(event.pattern_match.group(1))
     await event.reply(f"⏲️ Auto-delete time set to {delete_after} seconds.")
 
-# === /viewmsg ===
 @client.on(events.NewMessage(pattern=r'^/viewmsg$'))
 async def view_reply_message(event):
     if not is_saved_messages(event):
@@ -91,7 +103,11 @@ async def view_reply_message(event):
 async def auto_reply(event):
     global last_sent_time
 
-    if not event.is_group or event.chat_id not in active_groups:
+    if not event.is_group:
+        return
+
+    if event.chat_id not in active_groups:
+        print(f"[DEBUG] Ignored message from group {event.chat_id} (not in active_groups)")
         return
 
     try:
@@ -102,12 +118,10 @@ async def auto_reply(event):
     if not sender or sender.bot or sender.id == OWNER_ID or not reply_message:
         return
 
-    # Ignore short/empty/known words
     text = event.raw_text.strip().lower()
     if not text or text in IGNORE_WORDS:
         return
 
-    # Avoid spamming same user or chat
     user_id = sender.id
     now = asyncio.get_event_loop().time()
 
@@ -124,7 +138,7 @@ async def auto_reply(event):
             reply = await event.reply(reply_message)
             await asyncio.sleep(delete_after)
             await reply.delete()
-            await asyncio.sleep(random.randint(2, 4))  # delay between responses
+            await asyncio.sleep(random.randint(2, 4))
     except Exception as e:
         print(f"⚠️ Error replying: {e}")
 
@@ -137,13 +151,14 @@ async def run_server():
     app.router.add_get("/", handle)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 10000)  # Port for UptimeRobot
+    site = web.TCPSite(runner, "0.0.0.0", 10000)  # Render-compatible port
     await site.start()
 
 # === Combined Start ===
 async def main():
+    load_groups()
     await client.start()
-    print("🤖 UserBot is running with anti-ban logic, user-only reply mode...")
+    print("🤖 UserBot is running with anti-ban logic...")
     await asyncio.gather(
         client.run_until_disconnected(),
         run_server()
