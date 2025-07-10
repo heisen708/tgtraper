@@ -8,7 +8,7 @@ import os
 # === Your credentials ===
 api_id = 29010066
 api_hash = '2e0d5a624f4eb3991826a9abe13c78b7'
-string_session = '1BVtsOKEBu4Bw7rn5KoPXsA2VLOHqanw5MgQQIv7UlrY5fWE-3TQHGbjb_dxB_qzzqH9IWdtWegKUXvZwAylWqHsTBLB7j_-hXslw6SPGvWcOaUGyGs3sKjvAnT8cJw4BCSF8PJ2RgVCDucuRWESBj7gq-9VNc_-7LqBz3ryjIRQYL5nESJKS7pm3F1BIILm2Abtl76K47P2oJxrLP8oQBydZKIQAfDDtbr02bNcSMOPhCJilOgmqUIoZLxne9HzBIQK2bIupZDeIe2IQljyCWtVi7JzBAUp2KlyuOnFUJr-PJZHMRjOpmGZgufCaPTR2js_hgqPkHDd-Td3SecC51XfYLsvepWk='
+string_session = ''
 OWNER_ID = 7425304864
 
 client = TelegramClient(StringSession(string_session), api_id, api_hash)
