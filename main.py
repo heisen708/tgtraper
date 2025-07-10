@@ -16,9 +16,9 @@ client = TelegramClient(StringSession(string_session), api_id, api_hash)
 # === Settings ===
 GROUPS_FILE = "groups.txt"
 active_groups = set()
-reply_message = "Join our new movie group
+reply_message = " Join our new movie group
 Search and download all movies via @rexiebotcat.
-Old group inactive — join now"
+Old group inactive — join now "
 delete_after = 35
 IGNORE_WORDS = ['ok', 'thanks', '👍', '🙏', 'hi', 'hello']
 rate_limiter = asyncio.Semaphore(1)
