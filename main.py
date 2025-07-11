@@ -17,11 +17,9 @@ client = TelegramClient(StringSession(string_session), api_id, api_hash)
 GROUPS_FILE = "groups.txt"
 active_groups = set()
 reply_message = "Join our new movie group Search Here @rexiebotcat"
-delete_after = 635
+delete_after = 600  # in seconds
 IGNORE_WORDS = ['ok', 'thanks', '👍', '🙏', 'hi', 'hello']
-rate_limiter = asyncio.Semaphore(1)
 last_replied = {}
-last_sent_time = 0
 
 # === Persistent Storage ===
 def save_groups():
@@ -41,6 +39,7 @@ def load_groups():
 def is_saved_messages(event):
     return event.chat_id == OWNER_ID and event.is_private
 
+# === Group Management ===
 @client.on(events.NewMessage(pattern=r'^/add\s+(-?\d+)$'))
 async def add_group(event):
     if not is_saved_messages(event):
@@ -76,6 +75,7 @@ async def show_group_info(event):
     msg += f"\n⏳ Delete after: {delete_after} sec"
     await event.reply(msg)
 
+# === Customization ===
 @client.on(events.NewMessage(pattern=r'^/setmsg\s+([\s\S]+)'))
 async def set_reply_message(event):
     if not is_saved_messages(event):
@@ -98,24 +98,22 @@ async def view_reply_message(event):
         return
     await event.reply(f"📝 Current Reply Message:\n\n{reply_message}")
 
-# === Auto-reply Handler – Only to Users in Group ===
+# === Fast Auto Reply in Specific Groups ===
 @client.on(events.NewMessage(incoming=True))
 async def auto_reply(event):
-    global last_sent_time
-
-    if not event.is_group:
+    if not (event.is_group or event.is_channel):
         return
 
-    if event.chat_id not in active_groups:
-        print(f"[DEBUG] Ignored message from group {event.chat_id} (not in active_groups)")
+    group_id = event.chat_id
+    if group_id not in active_groups:
         return
 
     try:
         sender = await event.get_sender()
-    except:
-        return  # Skip if sender info not available
+    except Exception:
+        return
 
-    if not sender or sender.bot or sender.id == OWNER_ID or not reply_message:
+    if not sender or sender.bot or sender.id == OWNER_ID:
         return
 
     text = event.raw_text.strip().lower()
@@ -125,24 +123,19 @@ async def auto_reply(event):
     user_id = sender.id
     now = asyncio.get_event_loop().time()
 
-    if user_id in last_replied and now - last_replied[user_id] < 60:
-        return
-    if now - last_sent_time < 7:
-        return
+    if user_id in last_replied and now - last_replied[user_id] < 15:
+        return  # Reply once per 15 sec per user
 
     last_replied[user_id] = now
-    last_sent_time = now
 
     try:
-        async with rate_limiter:
-            reply = await event.reply(reply_message)
-            await asyncio.sleep(delete_after)
-            await reply.delete()
-            await asyncio.sleep(random.randint(2, 4))
+        reply = await event.reply(reply_message)
+        await asyncio.sleep(delete_after)
+        await reply.delete()
     except Exception as e:
         print(f"⚠️ Error replying: {e}")
 
-# === UptimeRobot Web Server ===
+# === Uptime Robot Handler ===
 async def handle(request):
     return web.Response(text="✅ UserBot is alive!")
 
@@ -151,14 +144,14 @@ async def run_server():
     app.router.add_get("/", handle)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 10000)  # Render-compatible port
+    site = web.TCPSite(runner, "0.0.0.0", 10000)
     await site.start()
 
-# === Combined Start ===
+# === Start ===
 async def main():
     load_groups()
     await client.start()
-    print("🤖 UserBot is running with anti-ban logic...")
+    print("🤖 UserBot started with fast replies...")
     await asyncio.gather(
         client.run_until_disconnected(),
         run_server()
