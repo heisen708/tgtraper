@@ -144,7 +144,7 @@ async def run_server():
     app.router.add_get("/", handle)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 8080)))
+    site = web.TCPSite(runner, "0.0.0.0", 10000)
     await site.start()
 
 # === Start ===
