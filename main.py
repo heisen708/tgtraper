@@ -13,13 +13,15 @@ OWNER_ID = 7425304864
 
 client = TelegramClient(StringSession(string_session), api_id, api_hash)
 
+# === Settings ===
 GROUPS_FILE = "groups.txt"
 active_groups = set()
 reply_message = "Join our new movie group Search Here @rexiebotcat"
-delete_after = 600
+delete_after = 600  # in seconds
 IGNORE_WORDS = ['ok', 'thanks', '👍', '🙏', 'hi', 'hello']
 last_replied = {}
 
+# === Persistent Storage ===
 def save_groups():
     with open(GROUPS_FILE, "w") as f:
         for gid in active_groups:
@@ -33,9 +35,11 @@ def load_groups():
                 if gid:
                     active_groups.add(int(gid))
 
+# === Check if command is from Saved Messages ===
 def is_saved_messages(event):
     return event.chat_id == OWNER_ID and event.is_private
 
+# === Group Management ===
 @client.on(events.NewMessage(pattern=r'^/add\s+(-?\d+)$'))
 async def add_group(event):
     if not is_saved_messages(event):
@@ -71,6 +75,7 @@ async def show_group_info(event):
     msg += f"\n⏳ Delete after: {delete_after} sec"
     await event.reply(msg)
 
+# === Customization ===
 @client.on(events.NewMessage(pattern=r'^/setmsg\s+([\s\S]+)'))
 async def set_reply_message(event):
     if not is_saved_messages(event):
@@ -93,6 +98,7 @@ async def view_reply_message(event):
         return
     await event.reply(f"📝 Current Reply Message:\n\n{reply_message}")
 
+# === Fast Auto Reply in Specific Groups ===
 @client.on(events.NewMessage(incoming=True))
 async def auto_reply(event):
     if not (event.is_group or event.is_channel):
@@ -118,7 +124,7 @@ async def auto_reply(event):
     now = asyncio.get_event_loop().time()
 
     if user_id in last_replied and now - last_replied[user_id] < 15:
-        return
+        return  # Reply once per 15 sec per user
 
     last_replied[user_id] = now
 
@@ -129,7 +135,7 @@ async def auto_reply(event):
     except Exception as e:
         print(f"⚠️ Error replying: {e}")
 
-# Health check endpoint
+# === Uptime Robot Handler ===
 async def handle(request):
     return web.Response(text="✅ UserBot is alive!")
 
@@ -141,20 +147,14 @@ async def run_server():
     site = web.TCPSite(runner, "0.0.0.0", 10000)
     await site.start()
 
-# Periodic no-op to try keeping the loop alive
-async def keep_alive_loop():
-    while True:
-        print("🌀 Keeping event loop alive...")
-        await asyncio.sleep(60)
-
+# === Start ===
 async def main():
     load_groups()
     await client.start()
     print("🤖 UserBot started with fast replies...")
     await asyncio.gather(
         client.run_until_disconnected(),
-        run_server(),
-        keep_alive_loop()
+        run_server()
     )
 
 asyncio.run(main())
